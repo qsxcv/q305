@@ -2,9 +2,10 @@
 
 #include <stddef.h>
 #include <stdint.h>
+#include <nrf.h>
 #include "delay.h"
 #include "spi.h"
-#include "srom.h"
+#include "hero_blob.h"
 
 static void hero_reg_write(const uint8_t reg, const uint8_t val)
 {
@@ -105,28 +106,28 @@ static int hero_init(void)
 
 	delay_us(1000); // is this necessary?
 
-	// 1
+	// 1 write blob
 	spi_cs_low();
 	hero_reg_write(0x2A, 0xCF); delay_us(34);
 	hero_reg_write(0x2B, 0x06); delay_us(34);
 	hero_reg_write(0x2C, 0x08); delay_us(34);
 	hero_reg_write(0x2D, 0x00); delay_us(34);
-	for (size_t i = 0; i < sizeof(srom)/sizeof(srom[0]); i += 2) {
-		hero_reg_write(0x2E, srom[i]);
-		hero_reg_write(0x2F, srom[i + 1]);
+	for (size_t i = 0; i < sizeof(hero_blob)/sizeof(hero_blob[0]); i += 2) {
+		hero_reg_write(0x2E, hero_blob[i]);
+		hero_reg_write(0x2F, hero_blob[i + 1]);
 	}
 	hero_reg_write(0x20, 0x80);
 	spi_cs_high();
 
-	// 2
+	// 2 verify blob
 	spi_cs_low();
 	hero_reg_write(0x2A, 0xCF); delay_us(34);
 	hero_reg_write(0x2B, 0x02); delay_us(34);
 	hero_reg_write(0x2C, 0x08); delay_us(34);
 	hero_reg_write(0x2D, 0x00); delay_us(34);
-	for (size_t i = 0; i < sizeof(srom)/sizeof(srom[0]); i += 2) {
+	for (size_t i = 0; i < sizeof(hero_blob)/sizeof(hero_blob[0]); i += 2) {
 		const struct two_bytes val = hero_reg_read2(0x2E, 0x2F);
-		if (val.val1 != srom[i] || val.val2 != srom[i + 1])
+		if (val.val1 != hero_blob[i] || val.val2 != hero_blob[i + 1])
 			return 1;
 	}
 	spi_cs_high();
