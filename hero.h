@@ -65,6 +65,7 @@ static void hero_83_80_03_x(const uint8_t x)
 	spi_cs_low();
 	(void)hero_reg_read(0x03);
 	spi_cs_high();
+	delay_us(1);
 	spi_cs_low();
 	hero_reg_write(0x03, x);
 	spi_cs_high();
@@ -119,8 +120,10 @@ static int hero_init(void)
 		hero_reg_write(0x2E, hero_blob[i]);
 		hero_reg_write(0x2F, hero_blob[i + 1]);
 	}
-	hero_reg_write(0x20, 0x80);
+	(void)spi_txrx(0x80);
 	spi_cs_high();
+
+	delay_us(1);
 
 	// 2 verify blob
 	spi_cs_low();
@@ -135,10 +138,14 @@ static int hero_init(void)
 	}
 	spi_cs_high();
 
+	delay_us(1);
+
 	// 3
 	spi_cs_low();
 	hero_reg_write(0x2A, 0x00);
 	spi_cs_high();
+
+	delay_us(1);
 
 	// 4
 	spi_cs_low();
@@ -162,6 +169,8 @@ static int hero_init(void)
 	hero_reg_write(0x76, 0x00);
 	spi_cs_high();
 
+	delay_us(1);
+
 	// 5
 	spi_cs_low();
 	hero_reg_write(0x30, 0x17);
@@ -171,6 +180,8 @@ static int hero_init(void)
 	hero_reg_write(0x34, 0x0F);
 	hero_reg_write(0x35, 0x0B);
 	spi_cs_high();
+
+	delay_us(1);
 
 	// 6 configure sleep?
 	spi_cs_low();
@@ -188,26 +199,30 @@ static int hero_init(void)
 	hero_reg_write(0x64, 0x06); delay_us(20);
 	spi_cs_high();
 
+	delay_us(1);
+
 	// 7
 	spi_cs_low();
 	(void)hero_reg_read(0x02);
 	hero_reg_write(0x02, 0x80);
 	spi_cs_high();
 
-	delay_us(850);
+	delay_us(764);
 
 	// 8 and 9
 	hero_83_80_03_x(0x40);
 
-	delay_us(7500);
+	delay_us(7095);
 
 	// 10 (dpi)
 	hero_set_dpi(800);
 
+	delay_us(2);
+
 	// 11 (read motion counts)
 	(void)hero_motion_burst();
 
-	delay_us(4500);
+	delay_us(4480);
 
 	// 12 (similar to 6) configure run?
 	spi_cs_low();
@@ -225,7 +240,7 @@ static int hero_init(void)
 	hero_reg_write(0x64, 0x06); delay_us(20);
 	spi_cs_high();
 
-	delay_us(100);
+	delay_us(20);
 
 	(void)hero_motion_burst();
 
