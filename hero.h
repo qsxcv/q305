@@ -32,6 +32,8 @@ static struct two_bytes hero_reg_read2(const uint8_t reg1, const uint8_t reg2)
 
 static volatile uint8_t *hero_motion_burst(void)
 {
+	spi_cs_low();
+
 	static volatile uint8_t rx_buf[7] = {0};
 	static volatile uint8_t tx_buf[7] = {0x80, 0x85, 0x86, 0x87, 0x88, 0x96, 0x80};
 	NRF_SPIM0->RXD.PTR = (uint32_t)rx_buf;
@@ -44,6 +46,7 @@ static volatile uint8_t *hero_motion_burst(void)
 	while (NRF_SPIM0->EVENTS_END == 0); // TODO avoid busy wait
 	NRF_SPIM0->EVENTS_END = 0;
 
+	spi_cs_high();
 	return rx_buf;
 }
 
@@ -97,21 +100,21 @@ static void hero_deepsleep(void)
 
 static int hero_init(void)
 {
-	delay_us(5000); // is this necessary?
+	delay_us(2000); // probably not necessary
 
 	// 0
 	spi_cs_low();
 	hero_reg_write(0x0A, 0x40);
 	spi_cs_high();
 
-	delay_us(1000); // is this necessary?
+	delay_us(1000);
 
 	// 1 write blob
 	spi_cs_low();
-	hero_reg_write(0x2A, 0xCF); delay_us(34);
-	hero_reg_write(0x2B, 0x06); delay_us(34);
-	hero_reg_write(0x2C, 0x08); delay_us(34);
-	hero_reg_write(0x2D, 0x00); delay_us(34);
+	hero_reg_write(0x2A, 0xCF); delay_us(20);
+	hero_reg_write(0x2B, 0x06); delay_us(20);
+	hero_reg_write(0x2C, 0x08); delay_us(20);
+	hero_reg_write(0x2D, 0x00); delay_us(20);
 	for (size_t i = 0; i < sizeof(hero_blob)/sizeof(hero_blob[0]); i += 2) {
 		hero_reg_write(0x2E, hero_blob[i]);
 		hero_reg_write(0x2F, hero_blob[i + 1]);
@@ -121,10 +124,10 @@ static int hero_init(void)
 
 	// 2 verify blob
 	spi_cs_low();
-	hero_reg_write(0x2A, 0xCF); delay_us(34);
-	hero_reg_write(0x2B, 0x02); delay_us(34);
-	hero_reg_write(0x2C, 0x08); delay_us(34);
-	hero_reg_write(0x2D, 0x00); delay_us(34);
+	hero_reg_write(0x2A, 0xCF); delay_us(20);
+	hero_reg_write(0x2B, 0x02); delay_us(20);
+	hero_reg_write(0x2C, 0x08); delay_us(20);
+	hero_reg_write(0x2D, 0x00); delay_us(20);
 	for (size_t i = 0; i < sizeof(hero_blob)/sizeof(hero_blob[0]); i += 2) {
 		const struct two_bytes val = hero_reg_read2(0x2E, 0x2F);
 		if (val.val1 != hero_blob[i] || val.val2 != hero_blob[i + 1])
@@ -171,18 +174,18 @@ static int hero_init(void)
 
 	// 6 configure sleep?
 	spi_cs_low();
-	hero_reg_write(0x03, 0x40); delay_us(34);
-	hero_reg_write(0x0B, 0x40); delay_us(34);
-	hero_reg_write(0x0E, 0x11); delay_us(34);
-	hero_reg_write(0x22, 0x08); delay_us(34);
-	hero_reg_write(0x23, 0x97); delay_us(34);
-	hero_reg_write(0x24, 0xB6); delay_us(34);
-	hero_reg_write(0x25, 0x36); delay_us(34);
-	hero_reg_write(0x26, 0xDA); delay_us(34);
-	hero_reg_write(0x27, 0x50); delay_us(34);
-	hero_reg_write(0x28, 0xC4); delay_us(34);
-	hero_reg_write(0x29, 0x06); delay_us(34);
-	hero_reg_write(0x64, 0x06); delay_us(34);
+	hero_reg_write(0x03, 0x40); delay_us(20);
+	hero_reg_write(0x0B, 0x40); delay_us(20);
+	hero_reg_write(0x0E, 0x11); delay_us(20);
+	hero_reg_write(0x22, 0x08); delay_us(20);
+	hero_reg_write(0x23, 0x97); delay_us(20);
+	hero_reg_write(0x24, 0xB6); delay_us(20);
+	hero_reg_write(0x25, 0x36); delay_us(20);
+	hero_reg_write(0x26, 0xDA); delay_us(20);
+	hero_reg_write(0x27, 0x50); delay_us(20);
+	hero_reg_write(0x28, 0xC4); delay_us(20);
+	hero_reg_write(0x29, 0x06); delay_us(20);
+	hero_reg_write(0x64, 0x06); delay_us(20);
 	spi_cs_high();
 
 	// 7
@@ -208,18 +211,18 @@ static int hero_init(void)
 
 	// 12 (similar to 6) configure run?
 	spi_cs_low();
-	hero_reg_write(0x03, 0x20); delay_us(34);
-	hero_reg_write(0x0B, 0x40); delay_us(34);
-	hero_reg_write(0x0E, 0x11); delay_us(34);
-	hero_reg_write(0x22, 0xC8); delay_us(34);
-	hero_reg_write(0x23, 0x97); delay_us(34);
-	hero_reg_write(0x24, 0xB6); delay_us(34);
-	hero_reg_write(0x25, 0x36); delay_us(34);
-	hero_reg_write(0x26, 0xDA); delay_us(34);
-	hero_reg_write(0x27, 0x50); delay_us(34);
-	hero_reg_write(0x28, 0xC4); delay_us(34);
-	hero_reg_write(0x29, 0x00); delay_us(34);
-	hero_reg_write(0x64, 0x06); delay_us(34);
+	hero_reg_write(0x03, 0x20); delay_us(20);
+	hero_reg_write(0x0B, 0x40); delay_us(20);
+	hero_reg_write(0x0E, 0x11); delay_us(20);
+	hero_reg_write(0x22, 0xC8); delay_us(20);
+	hero_reg_write(0x23, 0x97); delay_us(20);
+	hero_reg_write(0x24, 0xB6); delay_us(20);
+	hero_reg_write(0x25, 0x36); delay_us(20);
+	hero_reg_write(0x26, 0xDA); delay_us(20);
+	hero_reg_write(0x27, 0x50); delay_us(20);
+	hero_reg_write(0x28, 0xC4); delay_us(20);
+	hero_reg_write(0x29, 0x00); delay_us(20);
+	hero_reg_write(0x64, 0x06); delay_us(20);
 	spi_cs_high();
 
 	delay_us(100);
