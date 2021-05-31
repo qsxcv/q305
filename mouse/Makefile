@@ -1,7 +1,8 @@
 #CMSIS = ../CMSIS_5/CMSIS/Core/Include
 #MDK   = ../nrfx/mdk
-CMSIS = ./cmsis
-MDK = ./mdk
+CMSIS = ../cmsis
+MDK = ../mdk
+MDK_RAM = ../mdk_ram
 
 CC      := arm-none-eabi-gcc
 OBJCOPY := arm-none-eabi-objcopy
@@ -11,20 +12,21 @@ CFLAGS  = -g3 -O3 -std=gnu17 -Wall -Wextra -pedantic
 CFLAGS += -mcpu=cortex-m4 -mthumb -mabi=aapcs
 CFLAGS += -ffunction-sections -fdata-sections -fno-strict-aliasing -fno-builtin -fshort-enums
 
-DEFINES = -DCONFIG_GPIO_AS_PINRESET -DNRF52810_XXAA
+DEFINES = -DCONFIG_GPIO_AS_PINRESET -DNRF52810_XXAA -DMOUSE
 
 INCLUDE  = -I$(CMSIS)
 INCLUDE += -I$(MDK)
+INCLUDE += -I../common
 
 LDFLAGS_FLASH = -L$(MDK) -Tnrf52810_xxaa.ld -Wl,--gc-sections --specs=nano.specs
-LDFLAGS_RAM = -Tmdk_ram/nrf52810_xxaa_ram.ld -Wl,--gc-sections --specs=nano.specs
-LDFLAGS_RAMCOPY += -Tmdk_ram/nrf52810_xxaa_ramcopy.ld -Wl,--gc-sections --specs=nano.specs
+LDFLAGS_RAM = -L$(MDK_RAM) -T$(MDK_RAM)/nrf52810_xxaa_ram.ld -Wl,--gc-sections --specs=nano.specs
+LDFLAGS_RAMCOPY += -L$(MDK_RAM) -T$(MDK_RAM)/nrf52810_xxaa_ramcopy.ld -Wl,--gc-sections --specs=nano.specs
 
 STARTUP_FLASH = $(MDK)/gcc_startup_nrf52810.S $(MDK)/system_nrf52.c
 STARTUP_RAM = $(STARTUP_FLASH)
-STARTUP_RAMCOPY = mdk_ram/gcc_startup_nrf52810_ramcopy.S mdk_ram/system_nrf52_ramcopy.c
+STARTUP_RAMCOPY = $(MDK_RAM)/gcc_startup_nrf52810_ramcopy.S $(MDK_RAM)/system_nrf52_ramcopy.c
 
-SOURCES  = main.c
+SOURCES = main.c
 
 TARGET = mouse
 

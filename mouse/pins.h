@@ -24,12 +24,11 @@
 #define TP14 21 // nRESET
 #define TP15 22
 #define WHL_PULL 23
-// 24
-// 25
-// 26
+// 24 grounded
+// 25 grounded
+// 26 grounded
 #define TP22 27
 #define TP23 28 // AIN4
 #define TP19 29 // AIN5
 #define TP20 30 // AIN6
 #define TP21 31 // AIN7
-

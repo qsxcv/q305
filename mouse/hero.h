@@ -12,12 +12,17 @@ static void hero_reg_write(const uint8_t reg, const uint8_t val)
 	(void)spi_txrx(reg & ~0x80);
 	(void)spi_txrx(val);
 }
-
+/*
+static uint8_t hero_reg_write_readprev(const uint8_t reg, const uint8_t val)
+{
+	(void)spi_txrx(reg & ~0x80);
+	return spi_txrx(val);
+}
+*/
 static uint8_t hero_reg_read(const uint8_t reg)
 {
 	(void)spi_txrx(reg | 0x80);
-	const uint8_t ret = spi_txrx(0x80);
-	return ret;
+	return spi_txrx(0x80);
 }
 
 struct two_bytes { uint8_t val1, val2; };
@@ -30,24 +35,30 @@ static struct two_bytes hero_reg_read2(const uint8_t reg1, const uint8_t reg2)
 	return ret;
 }
 
-static volatile uint8_t *hero_motion_burst(void)
+static inline void hero_motion_burst(int16_t *x, int16_t *y)
 {
-	spi_cs_low();
-
-	static volatile uint8_t rx_buf[7] = {0};
-	static volatile uint8_t tx_buf[7] = {0x80, 0x85, 0x86, 0x87, 0x88, 0x96, 0x80};
-	NRF_SPIM0->RXD.PTR = (uint32_t)rx_buf;
+	// TODO split up this function since the RXD and TXD part doesn't need to be done every time.
+	// which only costs a fraction of a us
+	static volatile struct __PACKED {
+		uint8_t idk, reg_0x80;
+		int16_t x, y;
+		uint8_t reg_0x96;
+	} rx_buf;
+	static volatile uint8_t tx_buf[7] = {0x80, 0x88, 0x87, 0x86, 0x85, 0x96, 0x80};
+	NRF_SPIM0->RXD.PTR = (uint32_t)&rx_buf;
 	NRF_SPIM0->RXD.MAXCNT = 7;
 	NRF_SPIM0->TXD.PTR = (uint32_t)tx_buf;
 	NRF_SPIM0->TXD.MAXCNT = 7;
 
+	spi_cs_low();
 	NRF_SPIM0->EVENTS_END = 0;
 	NRF_SPIM0->TASKS_START = 1;
 	while (NRF_SPIM0->EVENTS_END == 0); // TODO avoid busy wait
 	NRF_SPIM0->EVENTS_END = 0;
-
 	spi_cs_high();
-	return rx_buf;
+
+	*x = rx_buf.x;
+	*y = rx_buf.y;
 }
 
 static void hero_set_dpi(const uint32_t dpi)
@@ -70,7 +81,7 @@ static void hero_83_80_03_x(const uint8_t x)
 	hero_reg_write(0x03, x);
 	spi_cs_high();
 }
-
+/*
 static void hero_sleep(void)
 {
 	spi_cs_low();
@@ -98,7 +109,9 @@ static void hero_deepsleep(void)
 	hero_83_80_03_x(0x28);
 	// TODO configure waking from deepsleep
 }
+*/
 
+__attribute__((optimize("Os")))
 static int hero_init(void)
 {
 	delay_us(2000); // probably not necessary
@@ -220,7 +233,8 @@ static int hero_init(void)
 	delay_us(2);
 
 	// 11 (read motion counts)
-	(void)hero_motion_burst();
+	int16_t dummy_x, dummy_y;
+	hero_motion_burst(&dummy_x, &dummy_y);
 
 	delay_us(4480);
 
@@ -242,9 +256,13 @@ static int hero_init(void)
 
 	delay_us(20);
 
-	(void)hero_motion_burst();
+	hero_motion_burst(&dummy_x, &dummy_y);
 
 	delay_us(50);
+
+	spi_cs_low();
+	hero_reg_write(0x20, 0); // framerate
+	spi_cs_high();
 
 	return 0;
 }
