@@ -7,7 +7,7 @@
 
 #define RADIO_MOUSE_FIRST 0x80
 #define RADIO_MOUSE_SYNC 0x40
-#define RADIO_MOUSE_OTHER 0x20
+#define RADIO_MOUSE_IGNORE 0x20
 
 union radio_mouse_data_t {
 	struct __PACKED {

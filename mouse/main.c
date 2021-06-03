@@ -50,8 +50,8 @@ SET_OUTPUT(TP6);
 		loop_wait();
 HIGH(TP6);
 		(void)hero_motion_burst(1);
-		radio_mouse_data.x += 0;
-		radio_mouse_data.y += 0;
+		radio_mouse_data.x = 0;
+		radio_mouse_data.y = 0;
 		radio_mouse_data.whl = 0;
 		radio_mouse_data.btn = RADIO_MOUSE_FIRST | RADIO_MOUSE_SYNC;
 

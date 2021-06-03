@@ -42,10 +42,9 @@ static inline struct motion_data hero_motion_burst(int set_ptrs)
 {
 	static struct __PACKED {
 		uint8_t idk, reg_0x80;
-		struct motion_data motion;
-		uint8_t reg_0x96;
+		uint8_t yhi, ylo, xhi, xlo;
 	} rx_buf;
-	static uint8_t tx_buf[7] = {0x80, 0x88, 0x87, 0x86, 0x85, 0x80};
+	static uint8_t tx_buf[7] = {0x80, 0x85, 0x86, 0x87, 0x88, 0x80};
 	if (set_ptrs) {
 		NRF_SPIM0->RXD.PTR = (uint32_t)&rx_buf;
 		NRF_SPIM0->RXD.MAXCNT = 6;
@@ -60,7 +59,11 @@ static inline struct motion_data hero_motion_burst(int set_ptrs)
 	NRF_SPIM0->EVENTS_END = 0;
 	spi_cs_high();
 
-	return rx_buf.motion;
+	struct motion_data motion = {
+		.dx = (rx_buf.xhi << 8) | rx_buf.xlo,
+		.dy = (rx_buf.yhi << 8) | rx_buf.ylo
+	};
+	return motion;
 }
 
 static void hero_set_dpi(const uint32_t dpi)
@@ -262,7 +265,7 @@ static int hero_init(void)
 	delay_us(50);
 
 	spi_cs_low();
-	hero_reg_write(0x20, 0); // framerate
+	hero_reg_write(0x20, 6); // framerate
 	spi_cs_high();
 
 	return 0;
