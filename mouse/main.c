@@ -14,31 +14,15 @@
 #include "hero.h"
 #include "radio.h"
 
-static void clock_init(void)
+static void init(void)
 {
 	NRF_CLOCK->EVENTS_HFCLKSTARTED = 0;
 	NRF_CLOCK->TASKS_HFCLKSTART = 1;
 	while (NRF_CLOCK->EVENTS_HFCLKSTARTED == 0);
 
-	// TODO lfclk
-}
-
-static void power_init(void)
-{
 	NRF_POWER->TASKS_LOWPWR = 1; // can't tell difference from CONSTLAT
-	NRF_POWER->DCDCEN = 1; //
-}
+	NRF_POWER->DCDCEN = 1;
 
-int main(void)
-{
-#ifdef VECT_TAB
-	SCB->VTOR = VECT_TAB;
-#endif
-
-	__disable_irq();
-SET_OUTPUT(TP6);
-	clock_init();
-	power_init();
 	delay_init();
 	led_init();
 	spi_init();
@@ -47,145 +31,101 @@ SET_OUTPUT(TP6);
 		LED_ON(LED_B);
 		while (1) __WFI();
 	}
-
 	radio_init();
+	loop_init();
+}
 
-	// time in units of 1/16 us ticks
-	const int period = 16 * 125; // 125us main loop period
-	const int max_backshift = 16 * 10; // maximum amount of backwards shift
-	int tune = 0; // positive means clock too slow
-	const int tune_denom = 1000000;
-	// tune/tune_denom == 1 corresponds to 1/period of clock inaccuracy
-	int offset = 0; // accumulated clock error
+int main(void)
+{
+#ifdef VECT_TAB
+	SCB->VTOR = VECT_TAB;
+#endif
+	__disable_irq();
 
+	init();
+SET_OUTPUT(TP6);
 
-	loop_init(period);
-	// first transmission and sync
+	// tell receiver about initial coordinates and set loop phase right
 	for (;;) {
-HIGH(TP6);
 		loop_wait();
-		radio_packet.mouse.btn = RADIO_MOUSE_FIRST | RADIO_MOUSE_SYNC;
-		radio_packet.mouse.whl = 0;
-		radio_packet.mouse.x = 1232;
-		radio_packet.mouse.y = 0;
+HIGH(TP6);
+		(void)hero_motion_burst(1);
+		radio_mouse_data.x += 0;
+		radio_mouse_data.y += 0;
+		radio_mouse_data.whl = 0;
+		radio_mouse_data.btn = RADIO_MOUSE_FIRST | RADIO_MOUSE_SYNC;
 
 		NRF_RADIO->TASKS_TXEN = 1;
 		radio_wait_disabled();
+		radio_mouse_data_prev = radio_mouse_data;
 
 		radio_mode_time();
 		NRF_RADIO->TASKS_RXEN = 1;
-		radio_wait_disabled();
-		radio_mode_mouse();
-
-		if (NRF_RADIO->CRCSTATUS == RADIO_CRCSTATUS_CRCSTATUS_CRCOk) {
-			int new_per = period - radio_packet.time.delta;
-			if (new_per < period - max_backshift)
-				new_per += period;
-			LOOP_TIMER->CC[0] = new_per;
-			break; // otherwise try again
+		NRF_RADIO->EVENTS_ADDRESS = 0;
+		delay_us(80);
+		if (NRF_RADIO->EVENTS_ADDRESS == 0) { // no address match, try again
+			NRF_RADIO->TASKS_STOP = 1;
+			NRF_RADIO->TASKS_DISABLE = 1;
+			radio_mode_mouse();
+		} else { // address match
+			radio_wait_disabled();
+			radio_mode_mouse();
+			if (NRF_RADIO->CRCSTATUS == RADIO_CRCSTATUS_CRCSTATUS_CRCOk) {
+				loop_tune_phase(radio_time_delta);
+				break; // else try again
+			}
 		}
 	}
 
-	int loops = 0;
-	for (uint32_t i = 0; ; i++) {
+	uint32_t sync_timeout = 0; // synchronize after 1s inactivity
+	uint32_t idle_timeout = 0; // TODO implement power saving
+	for (;;) {
 		loop_wait();
 HIGH(TP6);
-		loops++;
+		struct motion_data motion = hero_motion_burst(0);
+		radio_mouse_data.x += motion.dx;
+		radio_mouse_data.y += motion.dy;
+		radio_mouse_data.whl = 0;
+		radio_mouse_data.btn = 0;
 
-		offset += tune;
-		if (offset >= tune_denom) {
-			offset -= tune_denom;
-			loop_set_period(period - 1); // speed up by one tick
-		} else if (offset <= -tune_denom) {
-			offset += tune_denom;
-			loop_set_period(period + 1); // slow down by one tick
-		} else {
-			loop_set_period(period);
+		if (sync_timeout == 8000) { // sync
+			radio_mouse_data.btn |= RADIO_MOUSE_SYNC;
 		}
 
-		// TODO read buttons, wheel, sensor
-		//int16_t dx, dy;
-		//hero_motion_burst(&dx, &dy);
-		//radio_packet.mouse.x += dx;
-		//radio_packet.mouse.y += dy;
-
-		radio_packet.mouse.btn = 0;
-		radio_packet.mouse.whl = 0;
-		radio_packet.mouse.x = 1232;
-		radio_packet.mouse.y = 0;
-
-		if (i == 8000) { // sync
-			radio_packet.mouse.btn |= RADIO_MOUSE_SYNC;
-		}
-		// if anything is different from previous
-		{
+		if (radio_mouse_data.x_y != radio_mouse_data_prev.x_y ||
+			radio_mouse_data.btn_whl != radio_mouse_data_prev.btn_whl) {
 			NRF_RADIO->TASKS_TXEN = 1;
 			radio_wait_disabled();
+			radio_mouse_data_prev = radio_mouse_data;
+			sync_timeout = 0;
+			idle_timeout = 0;
+		} else {
+			sync_timeout++;
 		}
-		if (i == 8000) {
-			i = 0;
-			// since the prev. transmission and this can take longer than 125us
-			// in total, LOOP_IRQn will be pending and cause the __WFI() loop in
-			// radio_wait_disabled() here and the next loop_wait() to busy loop.
-			// so temporarily disable loop interrupt
-			LOOP_TIMER->INTENCLR = TIMER_INTENSET_COMPARE0_Enabled << TIMER_INTENSET_COMPARE0_Pos;
+
+		if ((radio_mouse_data.btn & RADIO_MOUSE_SYNC) != 0) {
+			sync_timeout = 0;
+			idle_timeout++;
 
 			radio_mode_time();
 			NRF_RADIO->TASKS_RXEN = 1;
-			radio_wait_disabled(); // TODO exit after maximum delay
-			radio_mode_mouse();
-
-			LOOP_TIMER->EVENTS_COMPARE[0] = 0;
-			LOOP_TIMER->INTENSET = TIMER_INTENSET_COMPARE0_Enabled << TIMER_INTENSET_COMPARE0_Pos;
-
-			if (NRF_RADIO->CRCSTATUS == RADIO_CRCSTATUS_CRCSTATUS_CRCOk) {
-				int error = radio_packet.time.delta;
-				if (error > 8 || error < -8) {
-					tune += error*(tune_denom/loops)/2;
-					loops = 0;
-
-					int new_per = period - error;
-					if (new_per < period - max_backshift)
-						new_per += period;
-					loop_set_period(new_per);
+			NRF_RADIO->EVENTS_ADDRESS = 0;
+			delay_us(80);
+			if (NRF_RADIO->EVENTS_ADDRESS == 0) { // no address match, give up
+				NRF_RADIO->TASKS_STOP = 1;
+				NRF_RADIO->TASKS_DISABLE = 1;
+			} else { // address match
+				radio_wait_disabled();
+				if (NRF_RADIO->CRCSTATUS == RADIO_CRCSTATUS_CRCSTATUS_CRCOk) {
+					int error = radio_time_delta;
+					if (error > 4 || error < -4) {
+						loop_tune_phase(error);
+						loop_tune_period(error);
+					}
 				}
 			}
+			radio_mode_mouse();
 		}
-LOW(TP6);
+LOW (TP6);
 	}
 }
-
-/*
-	volatile uint8_t hero_regs[0x80];
-	volatile uint8_t r = 0;
-	uint8_t prev = 0;
-	LED_ENABLE();
-
-	//spi_cs_low();
-	//hero_reg_write(0x20, 6);
-	//hero_reg_write(0x34, 0x0d);
-	//spi_cs_high();
-	while (1) {
-		//__WFI();
-		//volatile uint8_t *b = hero_motion_burst(); //2 yhi 3ylo 4xhi 5xlo
-		//int16_t x = (b[4] << 8) | b[5];
-
-		if (r == 128) r = 0;
-
-		spi_cs_low();
-		prev = hero_reg_write_readprev(r, 0x00);
-		spi_cs_high();
-
-		spi_cs_low();
-		for (uint8_t i = 0; i < 0x80; i++)
-			hero_regs[i] = hero_reg_read(i);
-		spi_cs_high();
-
-		delay_us(1000);
-		spi_cs_low();
-		hero_reg_write(r, prev);
-		spi_cs_high();
-
-		r++;
-	}
-*/

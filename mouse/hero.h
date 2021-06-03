@@ -35,20 +35,23 @@ static struct two_bytes hero_reg_read2(const uint8_t reg1, const uint8_t reg2)
 	return ret;
 }
 
-static inline void hero_motion_burst(int16_t *x, int16_t *y)
+struct motion_data {
+	int16_t dx; int16_t dy;
+};
+static inline struct motion_data hero_motion_burst(int set_ptrs)
 {
-	// TODO split up this function since the RXD and TXD part doesn't need to be done every time.
-	// which only costs a fraction of a us
-	static volatile struct __PACKED {
+	static struct __PACKED {
 		uint8_t idk, reg_0x80;
-		int16_t x, y;
+		struct motion_data motion;
 		uint8_t reg_0x96;
 	} rx_buf;
-	static volatile uint8_t tx_buf[7] = {0x80, 0x88, 0x87, 0x86, 0x85, 0x96, 0x80};
-	NRF_SPIM0->RXD.PTR = (uint32_t)&rx_buf;
-	NRF_SPIM0->RXD.MAXCNT = 7;
-	NRF_SPIM0->TXD.PTR = (uint32_t)tx_buf;
-	NRF_SPIM0->TXD.MAXCNT = 7;
+	static uint8_t tx_buf[7] = {0x80, 0x88, 0x87, 0x86, 0x85, 0x80};
+	if (set_ptrs) {
+		NRF_SPIM0->RXD.PTR = (uint32_t)&rx_buf;
+		NRF_SPIM0->RXD.MAXCNT = 6;
+		NRF_SPIM0->TXD.PTR = (uint32_t)tx_buf;
+		NRF_SPIM0->TXD.MAXCNT = 6;
+	}
 
 	spi_cs_low();
 	NRF_SPIM0->EVENTS_END = 0;
@@ -57,8 +60,7 @@ static inline void hero_motion_burst(int16_t *x, int16_t *y)
 	NRF_SPIM0->EVENTS_END = 0;
 	spi_cs_high();
 
-	*x = rx_buf.x;
-	*y = rx_buf.y;
+	return rx_buf.motion;
 }
 
 static void hero_set_dpi(const uint32_t dpi)
@@ -96,7 +98,7 @@ static void hero_wake_from_sleep(void)
 	// TODO disable waking
 	hero_83_80_03_x(0x20);
 	delay_us(10);
-	(void)hero_motion_burst();
+	(void)hero_motion_burst(1);
 	delay_us(20);
 	hero_83_80_03_x(0x20);
 }
@@ -233,8 +235,7 @@ static int hero_init(void)
 	delay_us(2);
 
 	// 11 (read motion counts)
-	int16_t dummy_x, dummy_y;
-	hero_motion_burst(&dummy_x, &dummy_y);
+	(void)hero_motion_burst(1);
 
 	delay_us(4480);
 
@@ -256,7 +257,7 @@ static int hero_init(void)
 
 	delay_us(20);
 
-	hero_motion_burst(&dummy_x, &dummy_y);
+	(void)hero_motion_burst(1);
 
 	delay_us(50);
 

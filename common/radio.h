@@ -9,24 +9,31 @@
 #define RADIO_MOUSE_SYNC 0x40
 #define RADIO_MOUSE_OTHER 0x20
 
-volatile union radio_packet_t {
+union radio_mouse_data_t {
 	struct __PACKED {
+		uint16_t x, y; // absolute
 		uint8_t btn; // 3 msb bits used as flags
 		uint8_t whl; // absolute
-		uint16_t x, y; // absolute
-	} mouse;
-	struct {
-		int16_t delta;
-	} time;
-} radio_packet;
-static_assert(sizeof(radio_packet.mouse) == 6);
-static_assert(offsetof(union radio_packet_t, time) == 0);
+	};
+	struct __PACKED { // easier to compare two packets
+		uint32_t x_y;
+		uint16_t btn_whl;
+	};
+};
+volatile union radio_mouse_data_t radio_mouse_data = {0};
+#ifdef MOUSE
+volatile union radio_mouse_data_t radio_mouse_data_prev = {0};
+#endif
+static_assert(sizeof(radio_mouse_data) == 6);
+
+volatile int16_t radio_time_delta;
 
 static inline void radio_mode_mouse(void)
 {
+	NRF_RADIO->PACKETPTR = (uint32_t)&radio_mouse_data;
 	NRF_RADIO->PCNF1 =
-		(sizeof(radio_packet.mouse) << RADIO_PCNF1_MAXLEN_Pos) |
-		(sizeof(radio_packet.mouse) << RADIO_PCNF1_STATLEN_Pos) |
+		(sizeof(radio_mouse_data) << RADIO_PCNF1_MAXLEN_Pos) |
+		(sizeof(radio_mouse_data) << RADIO_PCNF1_STATLEN_Pos) |
 		(4  << RADIO_PCNF1_BALEN_Pos) |
 		(RADIO_PCNF1_ENDIAN_Little << RADIO_PCNF1_ENDIAN_Pos) |
 		(RADIO_PCNF1_WHITEEN_Enabled << RADIO_PCNF1_WHITEEN_Pos);
@@ -34,9 +41,10 @@ static inline void radio_mode_mouse(void)
 
 static inline void radio_mode_time(void)
 {
+	NRF_RADIO->PACKETPTR = (uint32_t)&radio_time_delta;
 	NRF_RADIO->PCNF1 =
-		(sizeof(radio_packet.time) << RADIO_PCNF1_MAXLEN_Pos) |
-		(sizeof(radio_packet.time) << RADIO_PCNF1_STATLEN_Pos) |
+		(sizeof(radio_time_delta) << RADIO_PCNF1_MAXLEN_Pos) |
+		(sizeof(radio_time_delta) << RADIO_PCNF1_STATLEN_Pos) |
 		(4  << RADIO_PCNF1_BALEN_Pos) |
 		(RADIO_PCNF1_ENDIAN_Little << RADIO_PCNF1_ENDIAN_Pos) |
 		(RADIO_PCNF1_WHITEEN_Enabled << RADIO_PCNF1_WHITEEN_Pos);
@@ -75,8 +83,6 @@ static void radio_init()
 		(RADIO_CRCCNF_SKIPADDR_Skip << RADIO_CRCCNF_SKIPADDR_Pos);
 	NRF_RADIO->CRCPOLY = 0x00011021;
 	NRF_RADIO->CRCINIT = 0x0000FFFF;
-
-	NRF_RADIO->PACKETPTR = (uint32_t)&radio_packet;
 
 #if defined(MOUSE)
 	NRF_RADIO->TXADDRESS = 0 << RADIO_TXADDRESS_TXADDRESS_Pos;

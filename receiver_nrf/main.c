@@ -36,7 +36,7 @@ int main(void)
 
 	// time in units of 1/16 us ticks
 	const int period = 16 * 125; // us
-	const int ideal_rx_time = 16 * 75;
+	const int ideal_rx_time = 16 * 115;
 
 	// simulate a 1khz usb/spi timing
 	NRF_TIMER2->BITMODE = TIMER_BITMODE_BITMODE_32Bit << TIMER_BITMODE_BITMODE_Pos;
@@ -87,18 +87,17 @@ TOGGLE(3);
 		}
 
 		// placeholder for copying pkt to spi
-		if (radio_packet.mouse.x == 1232) {
+		if (radio_mouse_data.x < 1000) {
 			LED_ON(LED_1);
 		} else {
 			LED_OFF(LED_1);
-			LED_TOGGLE(LED_2);
 		}
 TOGGLE(3);
 
 		// if mouse requests sync
-		if (radio_packet.mouse.btn & RADIO_MOUSE_SYNC) {
+		if (radio_mouse_data.btn & RADIO_MOUSE_SYNC) {
 LED_TOGGLE(LED_3);
-			radio_packet.time.delta = (int16_t)NRF_TIMER0->CC[2] - ideal_rx_time;
+			radio_time_delta = (int16_t)NRF_TIMER0->CC[2] - ideal_rx_time;
 
 			// transmit time data
 			NRF_RADIO->EVENTS_DISABLED = 0;
