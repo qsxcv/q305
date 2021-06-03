@@ -100,7 +100,7 @@ int main(void)
 		__WFI();
 
 		// delay to read data as late as possible
-		delay_us(100);
+		delay_us(110);
 
 		// read sensor, wheel, buttons
 		spi_cs_low();

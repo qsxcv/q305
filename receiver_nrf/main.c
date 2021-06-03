@@ -49,7 +49,7 @@ int main(void)
 	SET_OUTPUT(4);
 
 	// time in units of 1/16 us ticks
-	const int ideal_rx_time = 16 * 100;
+	const int ideal_rx_time = 16 * 120;
 
 	// event when CS goes low
 	NRF_GPIOTE->CONFIG[0] =
@@ -76,10 +76,11 @@ int main(void)
 
 	NRF_RADIO->TASKS_RXEN = 1;
 	for (;;) {
+LOW(4);
 		NRF_RADIO->TASKS_START = 1;
 		NRF_RADIO->EVENTS_END = 0;
 		while (NRF_RADIO->EVENTS_END == 0);
-LED_TOGGLE(LED_1);
+HIGH(4);
 		if (NRF_RADIO->CRCSTATUS == RADIO_CRCSTATUS_CRCSTATUS_CRCError) {
 			radio_mouse_data.btn |= RADIO_MOUSE_IGNORE;
 LED_TOGGLE(LED_4);
