@@ -81,7 +81,7 @@ int main(void)
 	usb_init(1);
 
 	const uint32_t USBx_BASE = (uint32_t) USB_OTG_HS; // used in macros USBx_*
-	// fifo space when empty, should equal 0x174, from init_usb
+	// fifo space when empty, should equal 0x20, from init_usb
 	const uint32_t fifo_space = (USBx_INEP(1)->DTXFSTS & USB_OTG_DTXFSTS_INEPTFSAV);
 
 	int8_t whl_prev = 0;
@@ -115,7 +115,6 @@ int main(void)
 		spi_cs_high();
 
 		if ((rx.btn & RADIO_MOUSE_IGNORE) != 0) {
-LED_R_TOGGLE();
 			continue;
 		} else if ((rx.btn & RADIO_MOUSE_FIRST) != 0) {
 			whl_prev = rx.whl;
@@ -132,12 +131,8 @@ LED_R_TOGGLE();
 			y_prev = rx.y;
 		}
 
-		// if last packet still sitting in fifo
-		if ((USBx_INEP(1)->DTXFSTS & USB_OTG_DTXFSTS_INEPTFSAV) < fifo_space) {
-			// flush fifo
-			USB_OTG_HS->GRSTCTL = _VAL2FLD(USB_OTG_GRSTCTL_TXFNUM, 1) | USB_OTG_GRSTCTL_TXFFLSH;
-			while ((USB_OTG_HS->GRSTCTL & USB_OTG_GRSTCTL_TXFFLSH) != 0);
-		} else { // last loop transmitted successfully
+		// if last packet transmitted successfully, fifo will be empty
+		if ((USBx_INEP(1)->DTXFSTS & USB_OTG_DTXFSTS_INEPTFSAV) == fifo_space) {
 			send.dwhl = 0;
 			send.dx = 0;
 			send.dy = 0;
@@ -145,6 +140,10 @@ LED_R_TOGGLE();
 		send.dwhl += new.dwhl;
 		send.dx += new.dx;
 		send.dy += new.dy;
+
+		// flush fifo
+		USB_OTG_HS->GRSTCTL = _VAL2FLD(USB_OTG_GRSTCTL_TXFNUM, 1) | USB_OTG_GRSTCTL_TXFFLSH;
+		while ((USB_OTG_HS->GRSTCTL & USB_OTG_GRSTCTL_TXFFLSH) != 0);
 
 		// if there is data to transmitted
 		if (new.btn != send.btn || send.dwhl || send.dx || send.dy) {

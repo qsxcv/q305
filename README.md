@@ -72,7 +72,7 @@ consumption than stock firmware.
 
 ### easy things
 
-- buttons
+- dpi button
 - powersaving and sleep modes
 
 ### harder things

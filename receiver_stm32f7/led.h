@@ -2,7 +2,12 @@
 
 #include "stm32f7xx.h"
 
+#define LED_R_ON() GPIOA->ODR |= GPIO_ODR_OD7
+#define LED_R_OFF() GPIOA->ODR &= ~GPIO_ODR_OD7
 #define LED_R_TOGGLE() GPIOA->ODR ^= GPIO_ODR_OD7
+
+#define LED_G_ON() GPIOB->ODR |= GPIO_ODR_OD1
+#define LED_G_OFF() GPIOB->ODR &= ~GPIO_ODR_OD1
 #define LED_G_TOGGLE() GPIOB->ODR ^= GPIO_ODR_OD1
 
 void led_init(void)

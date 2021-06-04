@@ -192,7 +192,7 @@ void usb_init(int hs_usb)
 	// TODO changeback
 //	SetTxFiFo(&hpcd, 0, 0x80);
 	SetTxFiFo(&hpcd, 0, 0x20);
-	SetTxFiFo(&hpcd, 1, 0x174);
+	SetTxFiFo(&hpcd, 1, 0x20);
 	// USBD_RegisterClass(&USBD_Device, USBD_HID_CLASS)
 	USBD_Device.pClass = USBD_HID_CLASS;
 	USBD_Device.pConfDesc = (void *)USBD_HID_GetHSCfgDesc((uint16_t []){0}); // argument unused
