@@ -10,6 +10,7 @@
 #include "delay.h"
 #include "loop.h"
 #include "led.h"
+#include "buttons.h"
 #include "wheel.h"
 #include "spi.h"
 #include "hero.h"
@@ -26,6 +27,7 @@ static void init(void)
 
 	delay_init();
 	led_init();
+	buttons_init();
 	wheel_init();
 	spi_init();
 	if (hero_init() != 0) { // blob upload failed
@@ -52,6 +54,8 @@ SET_OUTPUT(TP6);
 		loop_wait();
 HIGH(TP6);
 		(void)hero_motion_burst(1);
+		(void)wheel_read();
+		(void)buttons_read_debounced();
 		radio_mouse_data.x = 0;
 		radio_mouse_data.y = 0;
 		radio_mouse_data.whl = 0;
@@ -83,13 +87,13 @@ HIGH(TP6);
 	uint32_t idle_timeout = 0; // TODO implement power saving
 	for (;;) {
 		loop_wait();
-HIGH(TP6);
 		union motion_data motion = hero_motion_burst(0);
 		radio_mouse_data.x += motion.dx;
 		radio_mouse_data.y += motion.dy;
 		radio_mouse_data.whl += wheel_read();
-		radio_mouse_data.btn = 0;
-
+HIGH(TP6);
+		radio_mouse_data.btn = buttons_read_debounced() & 0b00011111;
+LOW (TP6);
 		if (sync_timeout == 8000) { // sync
 			radio_mouse_data.btn |= RADIO_MOUSE_SYNC;
 		}
@@ -128,6 +132,5 @@ HIGH(TP6);
 			}
 			radio_mode_mouse();
 		}
-LOW (TP6);
 	}
 }

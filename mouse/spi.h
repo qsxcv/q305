@@ -58,9 +58,8 @@ static inline void spi_cs_high(void)
 
 static inline void spi_wait_end()
 {
-	do {
+	while (NRF_SPIM0->EVENTS_END == 0)
 		__WFI();
-	} while (NRF_SPIM0->EVENTS_END == 0);
 	NRF_SPIM0->EVENTS_END = 0;
 	NVIC_ClearPendingIRQ(SPIM0_SPIS0_SPI0_IRQn);
 }

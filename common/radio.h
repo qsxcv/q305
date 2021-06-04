@@ -111,9 +111,8 @@ static void radio_init()
 #ifdef MOUSE
 static inline void radio_wait_disabled()
 {
-	do {
+	while (NRF_RADIO->EVENTS_DISABLED == 0)
 		__WFI();
-	} while (NRF_RADIO->EVENTS_DISABLED == 0);
 	NRF_RADIO->EVENTS_DISABLED = 0;
 	NVIC_ClearPendingIRQ(RADIO_IRQn);
 }
