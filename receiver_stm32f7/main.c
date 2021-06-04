@@ -104,17 +104,18 @@ int main(void)
 
 		// read sensor, wheel, buttons
 		spi_cs_low();
-		delay_us(1);
+		delay_ticks(8);
 		rx.u8[0] = spi_recv();
 		rx.u8[1] = spi_recv();
 		rx.u8[2] = spi_recv();
 		rx.u8[3] = spi_recv();
 		rx.u8[4] = spi_recv();
 		rx.u8[5] = spi_recv();
-		delay_us(1);
+		delay_ticks(8);
 		spi_cs_high();
 
 		if ((rx.btn & RADIO_MOUSE_IGNORE) != 0) {
+LED_R_TOGGLE();
 			continue;
 		} else if ((rx.btn & RADIO_MOUSE_FIRST) != 0) {
 			whl_prev = rx.whl;

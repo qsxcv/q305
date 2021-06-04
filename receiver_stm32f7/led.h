@@ -4,7 +4,6 @@
 
 #define LED_R_TOGGLE() GPIOA->ODR ^= GPIO_ODR_OD7
 #define LED_G_TOGGLE() GPIOB->ODR ^= GPIO_ODR_OD1
-#define LED_B_TOGGLE() GPIOA->ODR ^= GPIO_ODR_OD5
 
 void led_init(void)
 {

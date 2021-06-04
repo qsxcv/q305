@@ -44,8 +44,8 @@ static void spi_init(void)
 	const uint32_t in =
 		(GPIO_PIN_CNF_DIR_Input << GPIO_PIN_CNF_DIR_Pos) |
 		(GPIO_PIN_CNF_INPUT_Connect << GPIO_PIN_CNF_INPUT_Pos);
-	NRF_P0->PIN_CNF[SPI_CS] = in;//|
-		//(GPIO_PIN_CNF_PULL_Pullup << GPIO_PIN_CNF_PULL_Pos);
+	NRF_P0->PIN_CNF[SPI_CS] = in |
+		(GPIO_PIN_CNF_PULL_Pullup << GPIO_PIN_CNF_PULL_Pos);
 	NRF_P0->PIN_CNF[SPI_SCK] = in;
 	NRF_P0->PIN_CNF[SPI_MOSI] = in;
 	NRF_P0->PIN_CNF[SPI_MISO] = in;

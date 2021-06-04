@@ -35,33 +35,35 @@ static struct two_bytes hero_reg_read2(const uint8_t reg1, const uint8_t reg2)
 	return ret;
 }
 
-struct motion_data {
-	int16_t dx; int16_t dy;
+union motion_data {
+	struct { int16_t dx; int16_t dy; };
+	uint32_t u32;
 };
-static inline struct motion_data hero_motion_burst(int set_ptrs)
+static inline union motion_data hero_motion_burst(int set_ptrs)
 {
 	static struct __PACKED {
-		uint8_t idk, reg_0x80;
-		uint8_t yhi, ylo, xhi, xlo;
+		uint8_t pad0, pad1, pad2; // pad for alignment of uint32_t later
+		uint8_t junk;
+		uint32_t yhi_ylo_xhi_xlo;
 	} rx_buf;
-	static uint8_t tx_buf[7] = {0x80, 0x85, 0x86, 0x87, 0x88, 0x80};
+	static uint8_t tx_buf[5] = {0x85, 0x86, 0x87, 0x88, 0x80};
+
 	if (set_ptrs) {
-		NRF_SPIM0->RXD.PTR = (uint32_t)&rx_buf;
-		NRF_SPIM0->RXD.MAXCNT = 6;
+		NRF_SPIM0->RXD.PTR = (uint32_t)&rx_buf.junk;
+		NRF_SPIM0->RXD.MAXCNT = 5;
 		NRF_SPIM0->TXD.PTR = (uint32_t)tx_buf;
-		NRF_SPIM0->TXD.MAXCNT = 6;
+		NRF_SPIM0->TXD.MAXCNT = 5;
 	}
 
 	spi_cs_low();
-	NRF_SPIM0->EVENTS_END = 0;
+	__NOP();__NOP();__NOP();__NOP();__NOP();__NOP(); // not necessary
+	__NOP();__NOP();__NOP();__NOP();__NOP();__NOP();
 	NRF_SPIM0->TASKS_START = 1;
-	while (NRF_SPIM0->EVENTS_END == 0); // TODO avoid busy wait
-	NRF_SPIM0->EVENTS_END = 0;
+	spi_wait_end();
 	spi_cs_high();
 
-	struct motion_data motion = {
-		.dx = (rx_buf.xhi << 8) | rx_buf.xlo,
-		.dy = (rx_buf.yhi << 8) | rx_buf.ylo
+	union motion_data motion = {
+		.u32=__REV(rx_buf.yhi_ylo_xhi_xlo) // big endian to little endian
 	};
 	return motion;
 }
@@ -119,7 +121,7 @@ static void hero_deepsleep(void)
 __attribute__((optimize("Os")))
 static int hero_init(void)
 {
-	delay_us(2000); // probably not necessary
+	delay_us(1000); // probably not necessary
 
 	// 0
 	spi_cs_low();

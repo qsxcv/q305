@@ -10,6 +10,7 @@
 #include "delay.h"
 #include "loop.h"
 #include "led.h"
+#include "wheel.h"
 #include "spi.h"
 #include "hero.h"
 #include "radio.h"
@@ -25,6 +26,7 @@ static void init(void)
 
 	delay_init();
 	led_init();
+	wheel_init();
 	spi_init();
 	if (hero_init() != 0) { // blob upload failed
 		LED_ENABLE();
@@ -82,10 +84,10 @@ HIGH(TP6);
 	for (;;) {
 		loop_wait();
 HIGH(TP6);
-		struct motion_data motion = hero_motion_burst(0);
+		union motion_data motion = hero_motion_burst(0);
 		radio_mouse_data.x += motion.dx;
 		radio_mouse_data.y += motion.dy;
-		radio_mouse_data.whl = 0;
+		radio_mouse_data.whl += wheel_read();
 		radio_mouse_data.btn = 0;
 
 		if (sync_timeout == 8000) { // sync

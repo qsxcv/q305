@@ -38,11 +38,12 @@ static void spi_init(void)
 	NRF_P0->OUTSET = (1 << SPI_CS) | (1 << SPI_SCK);
 	NRF_P0->OUTCLR = (1 << SPI_MOSI);
 
+	NRF_SPIM0->INTENSET = SPIM_INTENSET_END_Enabled << SPIM_INTENSET_END_Pos;
+	NVIC_EnableIRQ(SPIM0_SPIS0_SPI0_IRQn);
+
 	// enable
 	NRF_SPIM0->ENABLE =
 		(SPIM_ENABLE_ENABLE_Enabled << SPIM_ENABLE_ENABLE_Pos);
-
-	// TODO events/interrupts to avoid busy wait
 }
 
 static inline void spi_cs_low(void)
@@ -55,6 +56,16 @@ static inline void spi_cs_high(void)
 	NRF_P0->OUTSET = (1 << SPI_CS);
 }
 
+static inline void spi_wait_end()
+{
+	do {
+		__WFI();
+	} while (NRF_SPIM0->EVENTS_END == 0);
+	NRF_SPIM0->EVENTS_END = 0;
+	NVIC_ClearPendingIRQ(SPIM0_SPIS0_SPI0_IRQn);
+}
+
+
 static uint8_t spi_txrx(const uint8_t b)
 {
 	static volatile uint8_t rx_byte, tx_byte;
@@ -65,10 +76,8 @@ static uint8_t spi_txrx(const uint8_t b)
 	NRF_SPIM0->TXD.PTR = (uint32_t)&tx_byte;
 	NRF_SPIM0->TXD.MAXCNT = 1;
 
-	NRF_SPIM0->EVENTS_END = 0;
 	NRF_SPIM0->TASKS_START = 1;
-	while (NRF_SPIM0->EVENTS_END == 0); // TODO avoid busy wait
-	NRF_SPIM0->EVENTS_END = 0;
+	spi_wait_end();
 
 	return rx_byte;
 }

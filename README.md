@@ -72,7 +72,7 @@ consumption than stock firmware.
 
 ### easy things
 
-- buttons and wheel (lol)
+- buttons
 - powersaving and sleep modes
 
 ### harder things

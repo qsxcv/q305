@@ -22,7 +22,7 @@ union radio_mouse_data_t {
 };
 volatile union radio_mouse_data_t radio_mouse_data = {0};
 #ifdef MOUSE
-volatile union radio_mouse_data_t radio_mouse_data_prev = {0};
+union radio_mouse_data_t radio_mouse_data_prev = {0};
 #endif
 static_assert(sizeof(radio_mouse_data) == 6);
 
@@ -34,7 +34,7 @@ static inline void radio_mode_mouse(void)
 	NRF_RADIO->PCNF1 =
 		(sizeof(radio_mouse_data) << RADIO_PCNF1_MAXLEN_Pos) |
 		(sizeof(radio_mouse_data) << RADIO_PCNF1_STATLEN_Pos) |
-		(4  << RADIO_PCNF1_BALEN_Pos) |
+		(4 << RADIO_PCNF1_BALEN_Pos) |
 		(RADIO_PCNF1_ENDIAN_Little << RADIO_PCNF1_ENDIAN_Pos) |
 		(RADIO_PCNF1_WHITEEN_Enabled << RADIO_PCNF1_WHITEEN_Pos);
 }
@@ -45,7 +45,7 @@ static inline void radio_mode_time(void)
 	NRF_RADIO->PCNF1 =
 		(sizeof(radio_time_delta) << RADIO_PCNF1_MAXLEN_Pos) |
 		(sizeof(radio_time_delta) << RADIO_PCNF1_STATLEN_Pos) |
-		(4  << RADIO_PCNF1_BALEN_Pos) |
+		(4 << RADIO_PCNF1_BALEN_Pos) |
 		(RADIO_PCNF1_ENDIAN_Little << RADIO_PCNF1_ENDIAN_Pos) |
 		(RADIO_PCNF1_WHITEEN_Enabled << RADIO_PCNF1_WHITEEN_Pos);
 }
@@ -72,7 +72,7 @@ static void radio_init()
 
 	NRF_RADIO->FREQUENCY =
 		(20 << RADIO_FREQUENCY_FREQUENCY_Pos) |
-		(RADIO_FREQUENCY_MAP_Low <<RADIO_FREQUENCY_MAP_Pos);
+		(RADIO_FREQUENCY_MAP_Low << RADIO_FREQUENCY_MAP_Pos);
 	//NRF_RADIO->DATAWHITEIV = 0x55;
 	NRF_RADIO->BASE0   = 0xE7E7E7E7;
 	NRF_RADIO->BASE1   = 0x43434343;
@@ -111,7 +111,6 @@ static void radio_init()
 #ifdef MOUSE
 static inline void radio_wait_disabled()
 {
-	NRF_RADIO->EVENTS_DISABLED = 0;
 	do {
 		__WFI();
 	} while (NRF_RADIO->EVENTS_DISABLED == 0);

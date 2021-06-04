@@ -49,7 +49,8 @@ int main(void)
 	SET_OUTPUT(4);
 
 	// time in units of 1/16 us ticks
-	const int ideal_rx_time = 16 * 120;
+	const int nominal_period = 16 * 125;
+	const int ideal_rx_time = nominal_period - (16*5);
 
 	// event when CS goes low
 	NRF_GPIOTE->CONFIG[0] =
@@ -92,7 +93,13 @@ LED_TOGGLE(LED_4);
 		// if mouse requests sync
 		if (radio_mouse_data.btn & RADIO_MOUSE_SYNC) {
 LED_TOGGLE(LED_3);
-			radio_time_delta = (int16_t)NRF_TIMER0->CC[2] - ideal_rx_time;
+			int diff = NRF_TIMER0->CC[2] - ideal_rx_time;
+			if (diff > nominal_period/2) // probably spi isn't active
+				diff = 0;
+			else if (diff <= -nominal_period/2) // probably slightly too late rather than early
+				diff += nominal_period;
+
+			radio_time_delta = (int16_t)diff;
 
 			// transmit time data
 			NRF_RADIO->EVENTS_DISABLED = 0;
