@@ -120,6 +120,7 @@ LOW (TP6);
 			if (NRF_RADIO->EVENTS_ADDRESS == 0) { // no address match, give up
 				NRF_RADIO->TASKS_STOP = 1;
 				NRF_RADIO->TASKS_DISABLE = 1;
+				radio_wait_disabled();
 			} else { // address match
 				radio_wait_disabled();
 				if (NRF_RADIO->CRCSTATUS == RADIO_CRCSTATUS_CRCSTATUS_CRCOk) {
