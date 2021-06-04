@@ -8,11 +8,11 @@
 #define BUTTON_RELEASE_DEBOUNCE 16
 
 static_assert(
-	(BTN_R == BTN_L + 1 &&
+	BTN_R == BTN_L + 1 &&
 	BTN_M == BTN_L + 2 &&
 	BTN_F == BTN_L + 3 &&
 	BTN_B == BTN_L + 4 &&
-	BTN_DPI == BTN_L + 5),
+	BTN_DPI == BTN_L + 5,
 	"button pins not contiguous. change buttons_read_raw()"
 );
 
@@ -25,26 +25,22 @@ static inline uint8_t buttons_read_raw(void)
 
 static inline uint8_t buttons_read_debounced(void)
 {
-	const int release_lag = 8*BUTTON_RELEASE_DEBOUNCE;
+	const uint32_t release_lag = 8*BUTTON_RELEASE_DEBOUNCE;
 
-	static int prev = 0; // previous debounced state
-	// cycles (125us) for which button has been unpressed
-	static int time[6] = {0};
+	static uint32_t prev = 0; // previous debounced state
+	static uint32_t time[6] = {0}; // cycles (125us) for which button has been unpressed
 
-	int debounced = 0;
-	int raw = buttons_read_raw();
-
+	uint32_t debounced = buttons_read_raw();
+	const uint32_t released = prev & ~debounced;
 	for (int i = 0; i < 6; i++) {
-		if ((prev & (1<<i)) && (~raw & (1<<i))) {
+		if (released & (1 << i)) {
 			time[i]++;
 			if (time[i] < release_lag)
-				debounced |= (1<<i);
-		} else {
-			time[i] = 0;
-			debounced |= raw & (1<<i);
+				debounced |= (1 << i);
+			else
+				time[i] = 0;
 		}
 	}
-
 	prev = debounced;
 	return (uint8_t)debounced;
 }

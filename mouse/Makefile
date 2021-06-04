@@ -8,7 +8,7 @@ CC      := arm-none-eabi-gcc
 OBJCOPY := arm-none-eabi-objcopy
 SIZE    := arm-none-eabi-size
 
-CFLAGS  = -g3 -O3 -std=gnu17 -Wall -Wextra -pedantic
+CFLAGS  = -g3 -O3 -std=gnu17 -Wall -Wextra
 CFLAGS += -mcpu=cortex-m4 -mthumb -mabi=aapcs
 CFLAGS += -ffunction-sections -fdata-sections -fno-strict-aliasing -fno-builtin -fshort-enums
 
