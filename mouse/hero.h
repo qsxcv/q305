@@ -121,8 +121,6 @@ static void hero_deepsleep(void)
 __attribute__((optimize("Os")))
 static int hero_init(void)
 {
-	delay_us(1000); // probably not necessary
-
 	// 0
 	spi_cs_low();
 	hero_reg_write(0x0A, 0x40);

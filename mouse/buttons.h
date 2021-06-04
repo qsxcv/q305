@@ -2,6 +2,7 @@
 
 #include <stdint.h>
 #include <nrf.h>
+#include "delay.h"
 #include "pins.h"
 
 #define BUTTON_RELEASE_DEBOUNCE 16
@@ -61,4 +62,7 @@ static void buttons_init(void)
 	NRF_P0->PIN_CNF[BTN_B] = pullup_in;
 	NRF_P0->PIN_CNF[BTN_F] = pullup_in;
 	NRF_P0->PIN_CNF[BTN_DPI] = pullup_in;
+
+	delay_us(1000);
+	NRF_P0->LATCH = 0b00111111 << BTN_L;
 }
