@@ -122,7 +122,9 @@ int main(void)
 			y_prev = rx.y;
 			continue;
 		} else {
-			new.btn = rx.btn & 0b00011111; // mask flags
+			new.btn = rx.btn & 0b00000111; // mask flags
+			new.btn |= (rx.btn >> 1) & 0b00001000; // switch mouse4/5
+			new.btn |= (rx.btn << 1) & 0b00010000;
 			new.dwhl = rx.whl - whl_prev;
 			new.dx = rx.x - x_prev;
 			new.dy = y_prev - rx.y; // invert y

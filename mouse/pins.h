@@ -18,8 +18,8 @@
 #define BTN_L 15
 #define BTN_R 16
 #define BTN_M 17
-#define BTN_B 18
-#define BTN_F 19
+#define BTN_F 18 // usually back is mouse4
+#define BTN_B 19
 #define BTN_DPI 20
 #define TP14 21 // nRESET
 #define TP15 22

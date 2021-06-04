@@ -10,8 +10,8 @@
 static_assert(
 	(BTN_R == BTN_L + 1 &&
 	BTN_M == BTN_L + 2 &&
-	BTN_B == BTN_L + 3 &&
-	BTN_F == BTN_L + 4 &&
+	BTN_F == BTN_L + 3 &&
+	BTN_B == BTN_L + 4 &&
 	BTN_DPI == BTN_L + 5),
 	"button pins not contiguous. change buttons_read_raw()"
 );
@@ -59,8 +59,8 @@ static void buttons_init(void)
 	NRF_P0->PIN_CNF[BTN_L] = pullup_in;
 	NRF_P0->PIN_CNF[BTN_R] = pullup_in;
 	NRF_P0->PIN_CNF[BTN_M] = pullup_in;
-	NRF_P0->PIN_CNF[BTN_B] = pullup_in;
 	NRF_P0->PIN_CNF[BTN_F] = pullup_in;
+	NRF_P0->PIN_CNF[BTN_B] = pullup_in;
 	NRF_P0->PIN_CNF[BTN_DPI] = pullup_in;
 
 	delay_us(1000);
