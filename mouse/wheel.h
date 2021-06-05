@@ -37,7 +37,7 @@ static inline int wheel_read(void)
 		wheel_prev_diff = A;
 	else if (A != wheel_prev_same) {
 		wheel_prev_same = A;
-		return (A == wheel_prev_diff) ? -1 : 1;
+		return (A == wheel_prev_diff) ? 1 : -1;
 	}
 	return 0;
 }

@@ -1,7 +1,7 @@
 #pragma once
 
-#define WHL_A 0
-#define WHL_B 1
+#define WHL_B 0
+#define WHL_A 1
 #define BATT_SENSE 2 // AIN0
 #define LED_POWER 3 // AIN1
 #define TP6 4 // AIN2
