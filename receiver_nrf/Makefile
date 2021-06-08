@@ -30,7 +30,7 @@ SOURCES = main.c
 
 TARGET = receiver
 
-all: flash ram ramcopy
+all: ramcopy
 
 # runs from flash
 flash:

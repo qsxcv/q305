@@ -9,47 +9,54 @@
 #define RADIO_MOUSE_SYNC 0x40
 #define RADIO_MOUSE_IGNORE 0x20
 
-union radio_mouse_data_t {
+// note: _tx and _rx suffixes are from the perspective of the mouse
+
+// packets sent from mouse to receiver
+union radio_pkt_tx_t {
 	struct __PACKED {
 		uint16_t x, y; // absolute
 		uint8_t btn; // 3 msb bits used as flags
 		uint8_t whl; // absolute
-	};
+	} mouse;
 	struct __PACKED { // easier to compare two packets
 		uint32_t x_y;
 		uint16_t btn_whl;
-	};
+	} mouse_compact;
 };
-volatile union radio_mouse_data_t radio_mouse_data = {0};
+volatile union radio_pkt_tx_t radio_pkt_tx = {0};
 #ifdef MOUSE
-union radio_mouse_data_t radio_mouse_data_prev = {0};
+union radio_pkt_tx_t radio_pkt_tx_prev = {0};
 #endif
-static_assert(sizeof(radio_mouse_data) == 6);
+static_assert(sizeof(radio_pkt_tx) == 6);
 
-volatile int16_t radio_time_delta;
+// packets sent from receiver to mouse
+union radio_pkt_rx_t {
+	int16_t time_diff;
+	// in future, extend with data for commands from receiver to mouse
+};
+volatile union radio_pkt_rx_t radio_pkt_rx = {0};
 
-static inline void radio_mode_mouse(void)
+static inline void radio_conf_tx(void)
 {
-	NRF_RADIO->PACKETPTR = (uint32_t)&radio_mouse_data;
+	NRF_RADIO->PACKETPTR = (uint32_t)&radio_pkt_tx;
 	NRF_RADIO->PCNF1 =
-		(sizeof(radio_mouse_data) << RADIO_PCNF1_MAXLEN_Pos) |
-		(sizeof(radio_mouse_data) << RADIO_PCNF1_STATLEN_Pos) |
+		(sizeof(radio_pkt_tx) << RADIO_PCNF1_MAXLEN_Pos) |
+		(sizeof(radio_pkt_tx) << RADIO_PCNF1_STATLEN_Pos) |
 		(4 << RADIO_PCNF1_BALEN_Pos) |
 		(RADIO_PCNF1_ENDIAN_Little << RADIO_PCNF1_ENDIAN_Pos) |
 		(RADIO_PCNF1_WHITEEN_Enabled << RADIO_PCNF1_WHITEEN_Pos);
 }
 
-static inline void radio_mode_time(void)
+static inline void radio_conf_rx(void)
 {
-	NRF_RADIO->PACKETPTR = (uint32_t)&radio_time_delta;
+	NRF_RADIO->PACKETPTR = (uint32_t)&radio_pkt_rx;
 	NRF_RADIO->PCNF1 =
-		(sizeof(radio_time_delta) << RADIO_PCNF1_MAXLEN_Pos) |
-		(sizeof(radio_time_delta) << RADIO_PCNF1_STATLEN_Pos) |
+		(sizeof(radio_pkt_rx) << RADIO_PCNF1_MAXLEN_Pos) |
+		(sizeof(radio_pkt_rx) << RADIO_PCNF1_STATLEN_Pos) |
 		(4 << RADIO_PCNF1_BALEN_Pos) |
 		(RADIO_PCNF1_ENDIAN_Little << RADIO_PCNF1_ENDIAN_Pos) |
 		(RADIO_PCNF1_WHITEEN_Enabled << RADIO_PCNF1_WHITEEN_Pos);
 }
-
 
 static void radio_init()
 {
@@ -62,8 +69,6 @@ static void radio_init()
 		(0 << RADIO_PCNF0_S1LEN_Pos) |
 		(RADIO_PCNF0_S1INCL_Automatic << RADIO_PCNF0_S1INCL_Pos) |
 		(RADIO_PCNF0_PLEN_8bit << RADIO_PCNF0_PLEN_Pos);
-
-	radio_mode_mouse();
 
 	// fast rampup
 	NRF_RADIO->MODECNF0 =

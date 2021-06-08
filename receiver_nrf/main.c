@@ -19,6 +19,7 @@ static void init(void)
 	led_init();
 	spi_init();
 	radio_init();
+	radio_conf_tx();
 }
 
 // from system_nrf52.c
@@ -32,14 +33,14 @@ int main(void)
 #endif
 
 	// 3.3V for SPI with disco board
-	if ((NRF_UICR->REGOUT0 & UICR_REGOUT0_VOUT_Msk) !=
-		(UICR_REGOUT0_VOUT_3V3 << UICR_REGOUT0_VOUT_Pos)) {
-		nvmc_config(NVMC_CONFIG_WEN_Wen);
-		NRF_UICR->REGOUT0 = (UICR_REGOUT0_VOUT_3V3 << UICR_REGOUT0_VOUT_Pos);
-		nvmc_wait();
-		nvmc_config(NVMC_CONFIG_WEN_Ren);
-		NVIC_SystemReset();
-	}
+	//if ((NRF_UICR->REGOUT0 & UICR_REGOUT0_VOUT_Msk) !=
+		//(UICR_REGOUT0_VOUT_3V3 << UICR_REGOUT0_VOUT_Pos)) {
+		//nvmc_config(NVMC_CONFIG_WEN_Wen);
+		//NRF_UICR->REGOUT0 = (UICR_REGOUT0_VOUT_3V3 << UICR_REGOUT0_VOUT_Pos);
+		//nvmc_wait();
+		//nvmc_config(NVMC_CONFIG_WEN_Ren);
+		//NVIC_SystemReset();
+	//}
 
 	__disable_irq();
 
@@ -83,15 +84,20 @@ LOW(4);
 		while (NRF_RADIO->EVENTS_END == 0);
 HIGH(4);
 		if (NRF_RADIO->CRCSTATUS == RADIO_CRCSTATUS_CRCSTATUS_CRCError) {
-			radio_mouse_data.btn |= RADIO_MOUSE_IGNORE;
+			radio_pkt_tx.mouse.btn |= RADIO_MOUSE_IGNORE;
 LED_TOGGLE(LED_4);
 			continue;
 		}
 
-		// spi easydma reads from radio_mouse_data
+		if (radio_pkt_tx.mouse.btn & 1) // lmb pressed
+			LED_ON(LED_2);
+		else
+			LED_OFF(LED_2);
+
+		// spi easydma reads from radio_pkt_tx.mouse
 
 		// if mouse requests sync
-		if (radio_mouse_data.btn & RADIO_MOUSE_SYNC) {
+		if (radio_pkt_tx.mouse.btn & RADIO_MOUSE_SYNC) {
 LED_TOGGLE(LED_3);
 			int diff = NRF_TIMER0->CC[2] - ideal_rx_time;
 			if (diff > nominal_period/2) // probably spi isn't active
@@ -99,14 +105,14 @@ LED_TOGGLE(LED_3);
 			else if (diff <= -nominal_period/2) // probably slightly too late rather than early
 				diff += nominal_period;
 
-			radio_time_delta = (int16_t)diff;
+			radio_pkt_rx.time_diff = (int16_t)diff;
 
 			// transmit time data
 			NRF_RADIO->EVENTS_DISABLED = 0;
 			NRF_RADIO->TASKS_DISABLE = 1;
 			while (NRF_RADIO->EVENTS_DISABLED == 0);
 
-			radio_mode_time();
+			radio_conf_rx();
 			NRF_RADIO->TASKS_TXEN = 1;
 
 			NRF_RADIO->EVENTS_END = 0;
@@ -116,8 +122,8 @@ LED_TOGGLE(LED_3);
 			NRF_RADIO->TASKS_DISABLE = 1;
 			while (NRF_RADIO->EVENTS_DISABLED == 0);
 
-			// return to rx mode
-			radio_mode_mouse();
+			// return to mouse transmitting
+			radio_conf_tx();
 			NRF_RADIO->TASKS_RXEN = 1;
 		}
 	}

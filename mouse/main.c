@@ -14,6 +14,7 @@
 #include "wheel.h"
 #include "spi.h"
 #include "hero.h"
+#include "dpi.h"
 #include "radio.h"
 
 static void init(void)
@@ -26,16 +27,22 @@ static void init(void)
 	NRF_POWER->DCDCEN = 1;
 
 	delay_init();
+
 	led_init();
 	buttons_init();
 	wheel_init();
+
 	spi_init();
-	if (hero_init() != 0) { // blob upload failed
+	if (hero_init(dpi_list[DPI_INDEX_BOOT]) != 0) { // blob upload failed
 		LED_ENABLE();
 		LED_ON(LED_B);
 		while (1) __WFI();
 	}
+	hero_conf_motion();
+
 	radio_init();
+	radio_conf_tx();
+
 	loop_init();
 }
 
@@ -47,37 +54,35 @@ int main(void)
 	__disable_irq();
 
 	init();
-SET_OUTPUT(TP6);
 
 	// tell receiver about initial coordinates and set loop phase right
 	for (;;) {
 		loop_wait();
-HIGH(TP6);
-		(void)hero_motion_burst(1);
+		(void)hero_read_motion();
 		(void)wheel_read();
-		(void)buttons_read_debounced();
-		radio_mouse_data.x = 0;
-		radio_mouse_data.y = 0;
-		radio_mouse_data.whl = 0;
-		radio_mouse_data.btn = RADIO_MOUSE_FIRST | RADIO_MOUSE_SYNC;
+		(void)dpi_process(buttons_read_debounced());
+		radio_pkt_tx.mouse.x = 0;
+		radio_pkt_tx.mouse.y = 0;
+		radio_pkt_tx.mouse.whl = 0;
+		radio_pkt_tx.mouse.btn = RADIO_MOUSE_FIRST | RADIO_MOUSE_SYNC;
 
 		NRF_RADIO->TASKS_TXEN = 1;
 		radio_wait_disabled();
-		radio_mouse_data_prev = radio_mouse_data;
+		radio_pkt_tx_prev.mouse_compact = radio_pkt_tx.mouse_compact;
 
-		radio_mode_time();
+		radio_conf_rx();
 		NRF_RADIO->TASKS_RXEN = 1;
 		NRF_RADIO->EVENTS_ADDRESS = 0;
 		delay_us(80);
 		if (NRF_RADIO->EVENTS_ADDRESS == 0) { // no address match, try again
 			NRF_RADIO->TASKS_STOP = 1;
 			NRF_RADIO->TASKS_DISABLE = 1;
-			radio_mode_mouse();
+			radio_conf_tx();
 		} else { // address match
 			radio_wait_disabled();
-			radio_mode_mouse();
+			radio_conf_tx();
 			if (NRF_RADIO->CRCSTATUS == RADIO_CRCSTATUS_CRCSTATUS_CRCOk) {
-				loop_tune_phase(radio_time_delta);
+				loop_tune_phase(radio_pkt_rx.time_diff);
 				break; // else try again
 			}
 		}
@@ -87,33 +92,36 @@ HIGH(TP6);
 	uint32_t idle_timeout = 0; // TODO implement power saving
 	for (;;) {
 		loop_wait();
-		union motion_data motion = hero_motion_burst(0);
-		radio_mouse_data.x += motion.dx;
-		radio_mouse_data.y += motion.dy;
-		radio_mouse_data.whl += wheel_read();
-HIGH(TP6);
-		radio_mouse_data.btn = buttons_read_debounced() & 0b00011111;
-LOW (TP6);
+		const union motion_data motion = hero_read_motion();
+		radio_pkt_tx.mouse.x += motion.dx;
+		radio_pkt_tx.mouse.y += motion.dy;
+
+		radio_pkt_tx.mouse.whl += wheel_read();
+
+		const uint8_t btn_now = buttons_read_debounced();
+		dpi_process(btn_now);
+		radio_pkt_tx.mouse.btn = btn_now & 0b00011111;
+
 		if (sync_timeout == 8000) { // sync
-			radio_mouse_data.btn |= RADIO_MOUSE_SYNC;
+			radio_pkt_tx.mouse.btn |= RADIO_MOUSE_SYNC;
 		}
 
-		if (radio_mouse_data.x_y != radio_mouse_data_prev.x_y ||
-			radio_mouse_data.btn_whl != radio_mouse_data_prev.btn_whl) {
+		if (radio_pkt_tx.mouse_compact.x_y != radio_pkt_tx_prev.mouse_compact.x_y ||
+			radio_pkt_tx.mouse_compact.btn_whl != radio_pkt_tx_prev.mouse_compact.btn_whl) {
 			NRF_RADIO->TASKS_TXEN = 1;
 			radio_wait_disabled();
-			radio_mouse_data_prev = radio_mouse_data;
+			radio_pkt_tx_prev = radio_pkt_tx;
 			sync_timeout = 0;
 			idle_timeout = 0;
 		} else {
 			sync_timeout++;
 		}
 
-		if ((radio_mouse_data.btn & RADIO_MOUSE_SYNC) != 0) {
+		if ((radio_pkt_tx.mouse.btn & RADIO_MOUSE_SYNC) != 0) {
 			sync_timeout = 0;
 			idle_timeout++;
 
-			radio_mode_time();
+			radio_conf_rx();
 			NRF_RADIO->TASKS_RXEN = 1;
 			NRF_RADIO->EVENTS_ADDRESS = 0;
 			delay_us(80);
@@ -124,14 +132,14 @@ LOW (TP6);
 			} else { // address match
 				radio_wait_disabled();
 				if (NRF_RADIO->CRCSTATUS == RADIO_CRCSTATUS_CRCSTATUS_CRCOk) {
-					int error = radio_time_delta;
+					int error = radio_pkt_rx.time_diff;
 					if (error > 4 || error < -4) {
 						loop_tune_phase(error);
 						loop_tune_period(error);
 					}
 				}
 			}
-			radio_mode_mouse();
+			radio_conf_tx();
 		}
 	}
 }

@@ -11,6 +11,8 @@ for i, b in enumerate(spi_data[start:end:2, 2]):
 */
 #pragma once
 
+#include <stdint.h>
+
 // VECT_TAB is set if running from code ram.
 // in this case, don't load blob into ram.
 #ifdef VECT_TAB

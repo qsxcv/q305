@@ -7,18 +7,61 @@
 #include "spi.h"
 #include "hero_blob.h"
 
-static void hero_reg_write(const uint8_t reg, const uint8_t val)
+struct __PACKED hero_motion_rx_t {
+	uint8_t pad[4]; // pad so that the uint32_t motion data is aligned
+	uint32_t yhi_ylo_xhi_xlo;
+};
+volatile struct hero_motion_rx_t hero_motion_rx = {0};
+
+struct __PACKED hero_motion_tx_t {
+	uint8_t regs[5]; // list of registers to read
+};
+volatile struct hero_motion_tx_t hero_motion_tx = {
+	// important to read 0x85 before 0x86-0x88
+	//       y hi, y lo, x hi, x lo, unused
+	.regs = {0x85, 0x86, 0x87, 0x88, 0x80}
+};
+
+// make sure to call hero_conf_motion() before hero_read_motion()
+// after any calls to spi_txrx (for instance, from changing dpi)
+static void hero_conf_motion(void)
 {
-	(void)spi_txrx(reg & ~0x80);
-	(void)spi_txrx(val);
+	NRF_SPIM0->TXD.PTR = (uint32_t)&hero_motion_tx;
+	NRF_SPIM0->TXD.MAXCNT = sizeof(hero_motion_tx);
+
+	// first byte (unknown function) goes into pad[3]
+	// last 4 bytes go into yhi_ylo_xhi_xlo
+	NRF_SPIM0->RXD.PTR = (uint32_t)&hero_motion_rx.pad[3];
+	NRF_SPIM0->RXD.MAXCNT = sizeof(hero_motion_tx);
 }
-/*
-static uint8_t hero_reg_write_readprev(const uint8_t reg, const uint8_t val)
+
+union motion_data {
+	struct { int16_t dx; int16_t dy; };
+	uint32_t u32;
+};
+static inline union motion_data hero_read_motion(void)
+{
+	spi_cs_low();
+	// ensures 1us between falling edges of CS and SCLK. not sure if necessary
+	__NOP();__NOP();__NOP();__NOP();__NOP();__NOP();
+	__NOP();__NOP();__NOP();__NOP();__NOP();__NOP();
+	NRF_SPIM0->TASKS_START = 1;
+	spi_wait_end();
+	spi_cs_high();
+
+	// convert big endian to little endian
+	return (union motion_data){.u32 = __REV(hero_motion_rx.yhi_ylo_xhi_xlo)};
+}
+
+// writes val to reg and returns previous value of reg
+static uint8_t hero_reg_readwrite(const uint8_t reg, const uint8_t val)
 {
 	(void)spi_txrx(reg & ~0x80);
 	return spi_txrx(val);
 }
-*/
+
+#define hero_reg_write(reg, val) (void)hero_reg_readwrite(reg, val)
+
 static uint8_t hero_reg_read(const uint8_t reg)
 {
 	(void)spi_txrx(reg | 0x80);
@@ -33,39 +76,6 @@ static struct two_bytes hero_reg_read2(const uint8_t reg1, const uint8_t reg2)
 	ret.val1 = spi_txrx(reg2 | 0x80);
 	ret.val2 = spi_txrx(0x80);
 	return ret;
-}
-
-union motion_data {
-	struct { int16_t dx; int16_t dy; };
-	uint32_t u32;
-};
-static inline union motion_data hero_motion_burst(int set_ptrs)
-{
-	static struct __PACKED {
-		uint8_t pad0, pad1, pad2; // pad for alignment of uint32_t later
-		uint8_t junk;
-		uint32_t yhi_ylo_xhi_xlo;
-	} rx_buf;
-	static uint8_t tx_buf[5] = {0x85, 0x86, 0x87, 0x88, 0x80};
-
-	if (set_ptrs) {
-		NRF_SPIM0->RXD.PTR = (uint32_t)&rx_buf.junk;
-		NRF_SPIM0->RXD.MAXCNT = 5;
-		NRF_SPIM0->TXD.PTR = (uint32_t)tx_buf;
-		NRF_SPIM0->TXD.MAXCNT = 5;
-	}
-
-	spi_cs_low();
-	__NOP();__NOP();__NOP();__NOP();__NOP();__NOP(); // not necessary
-	__NOP();__NOP();__NOP();__NOP();__NOP();__NOP();
-	NRF_SPIM0->TASKS_START = 1;
-	spi_wait_end();
-	spi_cs_high();
-
-	union motion_data motion = {
-		.u32=__REV(rx_buf.yhi_ylo_xhi_xlo) // big endian to little endian
-	};
-	return motion;
 }
 
 static void hero_set_dpi(const uint32_t dpi)
@@ -119,7 +129,7 @@ static void hero_deepsleep(void)
 */
 
 __attribute__((optimize("Os")))
-static int hero_init(void)
+static int hero_init(const uint32_t dpi)
 {
 	// 0
 	spi_cs_low();
@@ -151,8 +161,10 @@ static int hero_init(void)
 	hero_reg_write(0x2D, 0x00); delay_us(20);
 	for (size_t i = 0; i < sizeof(hero_blob)/sizeof(hero_blob[0]); i += 2) {
 		const struct two_bytes val = hero_reg_read2(0x2E, 0x2F);
-		if (val.val1 != hero_blob[i] || val.val2 != hero_blob[i + 1])
+		if (val.val1 != hero_blob[i] || val.val2 != hero_blob[i + 1]) {
+			spi_cs_high();
 			return 1;
+		}
 	}
 	spi_cs_high();
 
@@ -233,12 +245,13 @@ static int hero_init(void)
 	delay_us(7095);
 
 	// 10 (dpi)
-	hero_set_dpi(800);
+	hero_set_dpi(dpi);
 
 	delay_us(2);
 
 	// 11 (read motion counts)
-	(void)hero_motion_burst(1);
+	hero_conf_motion();
+	(void)hero_read_motion();
 
 	delay_us(4480);
 
@@ -247,7 +260,7 @@ static int hero_init(void)
 	hero_reg_write(0x03, 0x20); delay_us(20);
 	hero_reg_write(0x0B, 0x40); delay_us(20);
 	hero_reg_write(0x0E, 0x11); delay_us(20);
-	hero_reg_write(0x22, 0xC8); delay_us(20);
+	hero_reg_write(0x22, 10); delay_us(20); // rest after about 5s
 	hero_reg_write(0x23, 0x97); delay_us(20);
 	hero_reg_write(0x24, 0xB6); delay_us(20);
 	hero_reg_write(0x25, 0x36); delay_us(20);
@@ -260,12 +273,13 @@ static int hero_init(void)
 
 	delay_us(20);
 
-	(void)hero_motion_burst(1);
+	hero_conf_motion();
+	(void)hero_read_motion();
 
 	delay_us(50);
 
 	spi_cs_low();
-	hero_reg_write(0x20, 6); // framerate
+	hero_reg_write(0x20, 6); // framerate about 8300fps
 	spi_cs_high();
 
 	return 0;

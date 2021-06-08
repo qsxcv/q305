@@ -53,7 +53,7 @@ static void spi_init(void)
 	// pointers
 	NRF_SPIS0->RXD.PTR = (uint32_t)&spi_rx_buf;
 	NRF_SPIS0->RXD.MAXCNT = 6;
-	NRF_SPIS0->TXD.PTR = (uint32_t)&radio_mouse_data;
+	NRF_SPIS0->TXD.PTR = (uint32_t)&radio_pkt_tx;
 	NRF_SPIS0->TXD.MAXCNT = 6;
 
 	// enable
